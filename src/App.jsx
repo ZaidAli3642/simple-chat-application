@@ -78,6 +78,8 @@ function ChatRoom() {
     idField: "id",
   });
 
+  console.log("messages addeqwe :  ", messages);
+
   const [formValue, setFormValue] = useState("");
   const [editValue, setIsEditValue] = useState(null);
   const [runEffect, setRunEffect] = useState(true);
