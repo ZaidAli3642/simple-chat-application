@@ -78,8 +78,6 @@ function ChatRoom() {
     idField: "id",
   });
 
-  console.log("messages addeqwe :  ", messages);
-
   const [formValue, setFormValue] = useState("");
   const [editValue, setIsEditValue] = useState(null);
   const [runEffect, setRunEffect] = useState(true);
@@ -99,15 +97,18 @@ function ChatRoom() {
   };
 
   const reactMessage = async ({ emoji, message }) => {
-    console.log("message dawrtaw : ", message, emoji);
     const messagesCollection = collection(firestore, "messages");
     const q = query(messagesCollection, where("uuid", "==", message.uuid));
 
     const messageDoc = await getDocs(q);
     const messageData = messageDoc.docs?.[0].data();
 
+    const filteredReactions = messageData.reactions.filter(
+      (reaction) => reaction.userId !== auth.currentUser.uid
+    );
+
     const reactions = [
-      ...messageData.reactions,
+      ...filteredReactions,
       { userId: auth.currentUser.uid, emoji },
     ];
 
@@ -117,6 +118,8 @@ function ChatRoom() {
       reactions,
     });
   };
+
+  const removeReaction = () => {};
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -204,7 +207,7 @@ function ChatRoom() {
 }
 
 function ChatMessage(props) {
-  const { text, uid, photoURL } = props.message;
+  const { text, uid, photoURL, reactions } = props.message;
   const {
     onEditMessage,
     onDeleteMessage,
@@ -227,13 +230,21 @@ function ChatMessage(props) {
         />
         <div style={{ position: "relative" }}>
           <p>{text}</p>
-          <div
-            className={
-              messageClass === "sent" ? `reactions-sent` : "reactions-received"
-            }
-          >
-            <span style={{ fontSize: "10px", marginInline: "2px" }}>😀</span>
-          </div>
+          {reactions?.length > 0 && (
+            <div
+              className={
+                messageClass === "sent"
+                  ? `reactions-sent`
+                  : "reactions-received"
+              }
+            >
+              {reactions.map((reaction) => (
+                <span style={{ fontSize: "10px", marginInline: "2px" }}>
+                  {reaction?.emoji}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {messageClass !== "sent" && (
