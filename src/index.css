@@ -70,7 +70,7 @@ button:focus-visible {
 
 .message-container > .messages {
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
 }
 
 .messages-visibility-hidden {

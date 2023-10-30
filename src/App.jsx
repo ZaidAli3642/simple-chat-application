@@ -102,9 +102,18 @@ function ChatRoom() {
     const q = query(messagesCollection, where("uuid", "==", message.uuid));
 
     const messageDoc = await getDocs(q);
-    const messageData = messageDoc.docs?.[0];
-    console.log("messagejknqwekbq hewq :", messageData, emoji);
+    const messageData = messageDoc.docs?.[0].data();
+
+    const reactions = [
+      ...messageData.reactions,
+      { userId: auth.currentUser.uid, emoji },
+    ];
+
     const docRef = doc(firestore, "messages", messageDoc.docs?.[0]?.id);
+
+    await updateDoc(docRef, {
+      reactions,
+    });
   };
 
   const sendMessage = async (e) => {
@@ -120,6 +129,7 @@ function ChatRoom() {
       uid,
       photoURL,
       uuid: uuid(),
+      reactions: [],
     });
 
     setFormValue("");
@@ -155,13 +165,13 @@ function ChatRoom() {
         setVisibility(true);
       }
     }
-  }, [messages]);
+  }, []);
 
   return (
     <div>
       <main className="message-container">
         <div id="content-ref" className={`messages`}>
-          {messages?.reverse().map((msg) => (
+          {messages?.map((msg) => (
             <ChatMessage
               key={msg.id}
               message={msg}
