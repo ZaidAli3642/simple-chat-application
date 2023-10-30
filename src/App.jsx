@@ -1,19 +1,31 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "./App.css";
+import { BsThreeDotsVertical } from "react-icons/bs";
+import { HiOutlineEmojiHappy } from "react-icons/hi";
+import { Popover } from "react-tiny-popover";
+import { v4 as uuid } from "uuid";
 
 import { auth, firestore } from "./firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import {
   collection,
-  FieldValue,
   orderBy,
   query,
   serverTimestamp,
   addDoc,
+  doc,
+  deleteDoc,
+  where,
+  getDoc,
+  getDocs,
+  updateDoc,
 } from "firebase/firestore";
 
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useCollectionData } from "react-firebase-hooks/firestore";
+import EmojiPicker from "emoji-picker-react";
+
+const emojis = ["😀", "🤝", "👍"];
 
 function App() {
   const [user] = useAuthState(auth);
@@ -57,16 +69,48 @@ function SignOut() {
 }
 
 function ChatRoom() {
+  const [visiblity, setVisibility] = useState(false);
   const messagesRef = collection(firestore, "messages");
 
   const messageQuery = query(messagesRef, orderBy("createdAt"));
 
-  const [messages] = useCollectionData(messageQuery, { idField: "id" });
+  const [messages, , , snapshot] = useCollectionData(messageQuery, {
+    idField: "id",
+  });
 
   const [formValue, setFormValue] = useState("");
+  const [editValue, setIsEditValue] = useState(null);
+  const [runEffect, setRunEffect] = useState(true);
+
+  const updateMessage = async () => {
+    setRunEffect(false);
+    const messagesCollection = collection(firestore, "messages");
+    const q = query(messagesCollection, where("uuid", "==", editValue.uuid));
+
+    const messageDoc = await getDocs(q);
+    const docRef = doc(firestore, "messages", messageDoc.docs?.[0]?.id);
+    await updateDoc(docRef, { text: formValue });
+
+    setFormValue("");
+    setIsEditValue(null);
+    setRunEffect(true);
+  };
+
+  const reactMessage = async ({ emoji, message }) => {
+    console.log("message dawrtaw : ", message, emoji);
+    const messagesCollection = collection(firestore, "messages");
+    const q = query(messagesCollection, where("uuid", "==", message.uuid));
+
+    const messageDoc = await getDocs(q);
+    const messageData = messageDoc.docs?.[0];
+    console.log("messagejknqwekbq hewq :", messageData, emoji);
+    const docRef = doc(firestore, "messages", messageDoc.docs?.[0]?.id);
+  };
 
   const sendMessage = async (e) => {
     e.preventDefault();
+
+    if (editValue) return updateMessage();
 
     const { uid, photoURL } = auth.currentUser;
 
@@ -75,6 +119,7 @@ function ChatRoom() {
       createdAt: serverTimestamp(),
       uid,
       photoURL,
+      uuid: uuid(),
     });
 
     setFormValue("");
@@ -82,12 +127,52 @@ function ChatRoom() {
     dummy.scrollIntoView({ behavior: "smooth" });
   };
 
+  const handleDeleteMessage = async (message) => {
+    try {
+      const messagesCollection = collection(firestore, "messages");
+      const q = query(messagesCollection, where("uuid", "==", message.uuid));
+
+      const messageDoc = await getDocs(q);
+      const docRef = doc(firestore, "messages", messageDoc.docs?.[0]?.id);
+      await deleteDoc(docRef);
+    } catch (error) {
+      console.log("Error :", error);
+    }
+  };
+
+  const handleEditMessage = async (message) => {};
+
+  useEffect(() => {
+    if (!runEffect) return;
+
+    const chatContainerRef = document.getElementById("content-ref");
+    if (chatContainerRef) {
+      if (messages) {
+        if (chatContainerRef.scrollHeight > 0) {
+          const dummy = document.getElementById("scroll-to-down");
+          dummy.scrollIntoView({});
+        }
+        setVisibility(true);
+      }
+    }
+  }, [messages]);
+
   return (
     <div>
-      <main>
-        {messages &&
-          messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)}
-
+      <main className="message-container">
+        <div id="content-ref" className={`messages`}>
+          {messages?.reverse().map((msg) => (
+            <ChatMessage
+              key={msg.id}
+              message={msg}
+              onDeleteMessage={() => handleDeleteMessage(msg)}
+              onEditMessage={() => handleEditMessage(msg)}
+              setIsEditValue={setIsEditValue}
+              setFormValue={setFormValue}
+              reactMessage={reactMessage}
+            />
+          ))}
+        </div>
         <span id="scroll-to-down"></span>
       </main>
 
@@ -108,21 +193,99 @@ function ChatRoom() {
 
 function ChatMessage(props) {
   const { text, uid, photoURL } = props.message;
+  const {
+    onEditMessage,
+    onDeleteMessage,
+    setIsEditValue,
+    setFormValue,
+    reactMessage,
+  } = props;
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [isOpenEmojiPicker, setIsOpenEmojiPicker] = useState(false);
 
   const messageClass = uid === auth.currentUser.uid ? "sent" : "received";
-  console.log("photoURL: ", photoURL);
 
   return (
-    <>
+    <div>
       <div key={props.key} className={`message ${messageClass}`}>
         <img
           src={
             photoURL || "https://api.adorable.io/avatars/23/abott@adorable.png"
           }
         />
-        <p>{text}</p>
+        <div style={{ position: "relative" }}>
+          <p>{text}</p>
+          <div
+            className={
+              messageClass === "sent" ? `reactions-sent` : "reactions-received"
+            }
+          >
+            <span style={{ fontSize: "10px", marginInline: "2px" }}>😀</span>
+          </div>
+        </div>
+
+        {messageClass !== "sent" && (
+          <div className="emoji-container">
+            <HiOutlineEmojiHappy
+              size={"20px"}
+              color="white"
+              onClick={() => setIsOpenEmojiPicker(true)}
+            />
+            {isOpenEmojiPicker && (
+              <div className="emoji-picker-container">
+                {emojis.map((emoji) => (
+                  <span
+                    style={{ marginInline: "5px", fontSize: "20px" }}
+                    onClick={() => {
+                      reactMessage({ emoji, message: props.message });
+                      setIsOpenEmojiPicker(false);
+                    }}
+                  >
+                    {emoji}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {messageClass === "sent" && (
+          <Popover
+            isOpen={isPopoverOpen}
+            positions={["top", "bottom", "left", "right"]} // preferred positions by priority
+            content={
+              <div className="message-options">
+                <span
+                  onClick={() => {
+                    setIsEditValue(props.message);
+                    setFormValue(props.message.text);
+                    setIsPopoverOpen(false);
+                  }}
+                >
+                  Edit
+                </span>
+                <span
+                  onClick={() => {
+                    onDeleteMessage(props.message);
+                    setIsPopoverOpen(false);
+                  }}
+                >
+                  Delete
+                </span>
+              </div>
+            }
+          >
+            <div onClick={() => setIsPopoverOpen(!isPopoverOpen)}>
+              <BsThreeDotsVertical
+                color="white"
+                cursor={"pointer"}
+                size={"20px"}
+              />
+            </div>
+          </Popover>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
