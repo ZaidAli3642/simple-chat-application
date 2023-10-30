@@ -5,7 +5,7 @@ import { HiOutlineEmojiHappy } from "react-icons/hi";
 import { Popover } from "react-tiny-popover";
 import { v4 as uuid } from "uuid";
 
-import { auth, firestore } from "./firebase";
+import { auth, firestore, database } from "./firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import {
   collection,
@@ -16,14 +16,12 @@ import {
   doc,
   deleteDoc,
   where,
-  getDoc,
   getDocs,
   updateDoc,
 } from "firebase/firestore";
 
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useCollectionData } from "react-firebase-hooks/firestore";
-import EmojiPicker from "emoji-picker-react";
 
 const emojis = ["😀", "🤝", "👍"];
 
@@ -160,17 +158,11 @@ function ChatRoom() {
   useEffect(() => {
     if (!runEffect) return;
 
-    const chatContainerRef = document.getElementById("content-ref");
-    if (chatContainerRef) {
-      if (messages) {
-        if (chatContainerRef.scrollHeight > 0) {
-          const dummy = document.getElementById("scroll-to-down");
-          dummy.scrollIntoView({});
-        }
-        setVisibility(true);
-      }
+    if (messages) {
+      const dummy = document.getElementById("scroll-to-down");
+      dummy.scrollIntoView({});
     }
-  }, []);
+  }, [messages]);
 
   return (
     <div>
